@@ -5,7 +5,6 @@ from data_fetcher import fetch_data
 
 # Fetch or load data
 data = fetch_data(REFRESH)
-# Your existing code for fetching data, setting up variables, etc.
 
 # Calculate and print the result
 def calculate_required_values(data):

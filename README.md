@@ -30,11 +30,30 @@ Edit the config.py file to set:
 - `REFRESH`: Set to True to fetch new data from APIs, False to use cached data
 
 ## File Structure
-- `main.py`: Entry point of the application
-- `config.py`: Configuration settings
-- `data_fetcher.py`: Handles API requests and data caching
-- `dcf_calculations.py`: Contains all DCF-related calculations
-- `financial_data.json`: Cached financial data
+```
+autoDcf/
+├── data/
+│   ├── financial_data.json
+│   ├── ir_data.json
+│   ├── balanceSheet_data.json
+│   ├── company_data.json
+│   ├── income_data.json
+│   ├── avg_interest_rates.json
+│   ├── cashflow_data.json
+│   ├── gdp_data.json
+├── src/
+│   ├── __init__.py
+│   ├── config.py
+│   ├── main.py
+│   ├── data_fetcher.py
+│   ├── dcf_calculations.py
+│   ├── excel_export.py
+├── .gitignore
+├── .gitattributes
+├── LICENSE
+├── README.md
+├── requirements.txt
+```
 
 ## API Data Sources
 - Financial Modeling Prep API: Company financials and profile

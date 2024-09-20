@@ -22,11 +22,11 @@ def fetch_data(refresh=REFRESH):
         }
 
         # Save data to JSON file
-        with open('financial_data.json', 'w') as f:
+        with open('data/financial_data.json', 'w') as f:
             json.dump(data, f)
     else:
         # Load data from JSON file
-        with open('financial_data.json', 'r') as f:
+        with open('data/financial_data.json', 'r') as f:
             data = json.load(f)
 
     return data

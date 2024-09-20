@@ -1,5 +1,5 @@
-# autoDcf
-autoDcf is a Python-based tool for performing automated Discounted Cash Flow (DCF) analysis on publicly traded companies. It uses both Free Cash Flow to Firm (FCFF) and Free Cash Flow to Equity (FCFE) methods to calculate intrinsic value per share.
+# AutoDCF
+AutoDCF is a Python-based tool for performing automated Discounted Cash Flow (DCF) analysis on publicly traded companies. It uses both Free Cash Flow to Firm (FCFF) and Free Cash Flow to Equity (FCFE) methods to calculate intrinsic value per share.
 
 ## Features
 - Fetches financial data from various APIs

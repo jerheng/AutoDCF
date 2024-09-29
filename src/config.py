@@ -1,4 +1,4 @@
-API_KEY = "ENTER YOUR API KEY"
-TICKER = "DNUT"
+API_KEY = ""
+TICKER = "AAPL"
 COUNTRY = "USA"
-REFRESH = False  # Set this to True to refresh data from APIs
+REFRESH = True  # Set this to True to refresh data from APIs

@@ -1,3 +1,4 @@
+import numpy as np
 from datetime import datetime
 from config import TICKER, COUNTRY
 
@@ -65,10 +66,13 @@ def calculate_wacc(balanceSheet_data, income_data, rf_rate, beta, market_risk_pr
     tax_rate = income_data[0]['incomeTaxExpense'] / income_data[0]['incomeBeforeTax']
     after_tax_cost_of_debt = cost_of_debt * (1 - tax_rate)
     
-    cost_of_equity = rf_rate + beta * market_risk_premium
+    cost_of_equity = calculate_cost_of_equity(rf_rate, beta, market_risk_premium)
     
     wacc = (total_debt / total_capital) * after_tax_cost_of_debt + (total_equity / total_capital) * cost_of_equity
     return wacc, cost_of_equity
+
+def calculate_cost_of_equity(rf_rate, beta, market_risk_premium):
+    return rf_rate + beta * market_risk_premium
 
 def project_cash_flows(initial_fcff, growth_rate, years):
     projected_cash_flows = []
@@ -79,16 +83,20 @@ def project_cash_flows(initial_fcff, growth_rate, years):
 def calculate_terminal_value(final_year_fcff, terminal_growth_rate, wacc):
     return final_year_fcff * (1 + terminal_growth_rate) / (wacc - terminal_growth_rate)
 
-def calculate_present_value(cash_flows, terminal_value, wacc):
-    pv_cash_flows = sum([cf / (1 + wacc) ** (i + 1) for i, cf in enumerate(cash_flows)])
-    pv_terminal_value = terminal_value / (1 + wacc) ** len(cash_flows)
+def calculate_present_value(cash_flows, terminal_value, discount_rate):
+    pv_cash_flows = sum([cf / (1 + discount_rate) ** (i + 1) for i, cf in enumerate(cash_flows)])
+    pv_terminal_value = terminal_value / (1 + discount_rate) ** len(cash_flows)
     return pv_cash_flows + pv_terminal_value
 
 def calculate_firm_and_equity_value(present_value, balanceSheet_data):
     firm_value = present_value
     net_debt = balanceSheet_data[0]['netDebt']
-    equity_value = firm_value - net_debt
+    non_operating_assets = balanceSheet_data[0].get('nonOperatingAssets', 0)  # Adjust for non-operating assets
+    equity_value = firm_value - net_debt + non_operating_assets
     return firm_value, equity_value
+
+def mean_reversion_growth_rate(current_cagr, historical_market_return, years):
+    return current_cagr + (historical_market_return - current_cagr) * (1 - np.exp(-0.5 * np.arange(years)))
 
 def calculate_dcf(data, rf_rate, beta, market_risk_premium, growth_rate, terminal_growth_rate, years, debug=False):
     cashflow_data = data['cashflow_data']
@@ -98,14 +106,19 @@ def calculate_dcf(data, rf_rate, beta, market_risk_premium, growth_rate, termina
     # FCFF calculation
     fcff = calculate_fcff(cashflow_data, income_data)
     wacc, cost_of_equity = calculate_wacc(balanceSheet_data, income_data, rf_rate, beta, market_risk_premium)
-    fcff_projected_cash_flows = project_cash_flows(fcff, growth_rate, years)
+    
+    # Apply mean reversion to growth rate
+    historical_market_return = 0.10  # Assuming 10% historical S&P 500 return
+    mean_reverted_growth_rates = mean_reversion_growth_rate(growth_rate, historical_market_return, years)
+    
+    fcff_projected_cash_flows = [fcff * (1 + rate) for rate in mean_reverted_growth_rates]
     fcff_terminal_value = calculate_terminal_value(fcff_projected_cash_flows[-1], terminal_growth_rate, wacc)
     fcff_present_value = calculate_present_value(fcff_projected_cash_flows, fcff_terminal_value, wacc)
     fcff_firm_value, fcff_equity_value = calculate_firm_and_equity_value(fcff_present_value, balanceSheet_data)
     
     # FCFE calculation
     fcfe = calculate_fcfe(cashflow_data, income_data, balanceSheet_data)
-    fcfe_projected_cash_flows = project_cash_flows(fcfe, growth_rate, years)
+    fcfe_projected_cash_flows = [fcfe * (1 + rate) for rate in mean_reverted_growth_rates]
     fcfe_terminal_value = calculate_terminal_value(fcfe_projected_cash_flows[-1], terminal_growth_rate, cost_of_equity)
     fcfe_present_value = calculate_present_value(fcfe_projected_cash_flows, fcfe_terminal_value, cost_of_equity)
     fcfe_equity_value = fcfe_present_value
@@ -127,7 +140,7 @@ def calculate_dcf(data, rf_rate, beta, market_risk_premium, growth_rate, termina
         ("Risk-free Rate", rf_rate),
         ("Market Risk Premium", market_risk_premium),
         ("Beta", beta),
-        ("Estimated Growth Rate", growth_rate),
+        ("Initial Growth Rate", growth_rate),
         ("Terminal Growth Rate", terminal_growth_rate),
         ("Shares Outstanding", shares_outstanding),
         ("Cost of Equity", cost_of_equity)
@@ -150,7 +163,7 @@ def calculate_dcf(data, rf_rate, beta, market_risk_premium, growth_rate, termina
         for var, val in common_variables:
             print(f"{var:<25} | {val:.2%}" if isinstance(val, float) else f"{var:<25} | {val:,}")
         
-        print("\nProjected Cash Flows")
+        print("\nProjected Cash Flows (with Mean Reversion)")
         print("=" * 76)
         print(f"{'Year':<10} | {'FCFF':<22} | {'FCFE':<22}")
         print("=" * 76)
@@ -158,6 +171,45 @@ def calculate_dcf(data, rf_rate, beta, market_risk_premium, growth_rate, termina
             print(f"{year:<10} | ${fcff:,.2f} | ${fcfe:,.2f}")
     
     return fcff_intrinsic_value_per_share, fcfe_intrinsic_value_per_share, fcff_data, common_variables, projected_cash_flows
+
+def monte_carlo_simulation(data, rf_rate, beta, market_risk_premium, growth_rate, terminal_growth_rate, years, num_simulations=1000):
+    results = {
+        'fcff': [],
+        'fcfe': []
+    }
+    
+    for _ in range(num_simulations):
+        # Sample input parameters from distributions
+        sampled_rf_rate = np.random.normal(rf_rate, 0.005)  # Assuming 0.5% std dev
+        sampled_beta = np.random.normal(beta, 0.1)  # Assuming 0.1 std dev
+        sampled_market_risk_premium = np.random.normal(market_risk_premium, 0.01)  # Assuming 1% std dev
+        sampled_growth_rate = np.random.triangular(growth_rate - 0.02, growth_rate, growth_rate + 0.02)
+        sampled_terminal_growth_rate = np.random.triangular(terminal_growth_rate - 0.005, terminal_growth_rate, terminal_growth_rate + 0.005)
+        
+        # Run DCF with sampled parameters
+        fcff_value, fcfe_value, _, _, _ = calculate_dcf(
+            data, sampled_rf_rate, sampled_beta, sampled_market_risk_premium, 
+            sampled_growth_rate, sampled_terminal_growth_rate, years, debug=False
+        )
+        
+        results['fcff'].append(fcff_value)
+        results['fcfe'].append(fcfe_value)
+    
+    return results
+
+def analyze_monte_carlo_results(results):
+    analysis = {}
+    for method in results:
+        values = np.array(results[method])
+        analysis[method] = {
+            'mean': np.mean(values),
+            'median': np.median(values),
+            'std_dev': np.std(values),
+            'min': np.min(values),
+            'max': np.max(values),
+            '95_ci': np.percentile(values, [2.5, 97.5])
+        }
+    return analysis
 
 # Calculate the required values using the data
 # rf_rate = get_risk_free_rate(data)
